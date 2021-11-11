@@ -29,6 +29,14 @@ const spi_pinmap_t static_spi_pinmap = get_spi_pinmap(MBED_CONF_SD_SPI_MOSI, MBE
 #endif
 #endif
 
+#if COMPONENT_FLASHIAP
+#include "FlashIAP/FlashIAPBlockDevice.h"
+#endif
+
+#if COMPONENT_NUSD
+#include "NuSDFlashSimBlockDevice.h"
+#endif
+
 BlockDevice *BlockDevice::get_default_instance()
 {
 #if COMPONENT_SPIF
@@ -64,7 +72,7 @@ BlockDevice *BlockDevice::get_default_instance()
 
 #else
 
-    return NULL;
+    return nullptr;
 
 #endif
 
@@ -75,10 +83,50 @@ BlockDevice *BlockDevice::get_default_instance()
  * By default it simply returns what is returned by BlockDevice::get_default_instance();
  */
 mbed::BlockDevice* get_secondary_bd(void) {
+#if TARGET_NUVOTON
+#   if TARGET_NUMAKER_IOT_M467_FLASHIAP || \
+       TARGET_NUMAKER_IOT_M467_FLASHIAP_TEST
+    static FlashIAPBlockDevice fbd(MCUBOOT_PRIMARY_SLOT_START_ADDR + MCUBOOT_SLOT_SIZE, MCUBOOT_SLOT_SIZE);
+    return &fbd;
+#   elif TARGET_NUMAKER_IOT_M467_SPIF || \
+         TARGET_NUMAKER_IOT_M467_SPIF_TEST
+    /* Whether or not QE bit is set, explicitly disable WP/HOLD functions for safe. */
+    static mbed::DigitalOut onboard_spi_wp(PI_13, 1);
+    static mbed::DigitalOut onboard_spi_hold(PI_12, 1);
+    static SPIFBlockDevice spif_bd(MBED_CONF_SPIF_DRIVER_SPI_MOSI,
+                                   MBED_CONF_SPIF_DRIVER_SPI_MISO,
+                                   MBED_CONF_SPIF_DRIVER_SPI_CLK,
+                                   MBED_CONF_SPIF_DRIVER_SPI_CS);
+    static mbed::SlicingBlockDevice sliced_bd(&spif_bd, 0x0, MCUBOOT_SLOT_SIZE);
+    return &sliced_bd;
+#   elif TARGET_NUMAKER_IOT_M487_SPIF || \
+         TARGET_NUMAKER_IOT_M487_SPIF_TEST
+    /* Whether or not QE bit is set, explicitly disable WP/HOLD functions for safe. */
+    static mbed::DigitalOut onboard_spi_wp(PC_5, 1);
+    static mbed::DigitalOut onboard_spi_hold(PC_4, 1);
+    static SPIFBlockDevice spif_bd(MBED_CONF_SPIF_DRIVER_SPI_MOSI,
+                                   MBED_CONF_SPIF_DRIVER_SPI_MISO,
+                                   MBED_CONF_SPIF_DRIVER_SPI_CLK,
+                                   MBED_CONF_SPIF_DRIVER_SPI_CS);
+    static mbed::SlicingBlockDevice sliced_bd(&spif_bd, 0x0, MCUBOOT_SLOT_SIZE);
+    return &sliced_bd;
+#   elif TARGET_NUMAKER_IOT_M467_NUSD || \
+         TARGET_NUMAKER_IOT_M467_NUSD_TEST || \
+         TARGET_NUMAKER_IOT_M487_NUSD || \
+         TARGET_NUMAKER_IOT_M487_NUSD_TEST
+    /* For NUSD, use the flash-simulate variant to fit MCUboot flash map backend. */
+    static NuSDFlashSimBlockDevice nusd_flashsim;
+    static mbed::SlicingBlockDevice sliced_bd(&nusd_flashsim, 0x0, MCUBOOT_SLOT_SIZE);
+    return &sliced_bd;
+#   else
+#   error("Target not support: Block device for secondary slot")
+#   endif
+#else
     // In this case, our flash is much larger than a single image so
     // slice it into the size of an image slot
     mbed::BlockDevice* default_bd = mbed::BlockDevice::get_default_instance();
     static mbed::SlicingBlockDevice sliced_bd(default_bd, 0x0, MCUBOOT_SLOT_SIZE);
     return &sliced_bd;
+#endif
 }
 

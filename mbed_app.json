@@ -1,5 +1,5 @@
 {
-    "requires": ["bare-metal", "mbedtls", "mcuboot", "flashiap-block-device", "spif-driver", "qspif", "mbed-trace", "sd"],
+    "requires": ["bare-metal", "mbedtls", "mcuboot", "flashiap-block-device", "spif-driver", "qspif", "mbed-trace", "sd", "nusd"],
     "config": {
         "serial-bootloader-enable": {
             "help": "Build bootloader with serial update support",
@@ -9,12 +9,95 @@
     "target_overrides": {
         "*": {
             "platform.stdio-baud-rate": 115200,
+            "platform.stdio-minimal-console-only": true,
+            "platform.use-mpu": false,
+            "target.boot-stack-size": "0x1800",
             "target.restrict_size": "0x20000",
             "target.c_lib": "small",
-            "mcuboot.log-level": "MCUBOOT_LOG_LEVEL_DEBUG",
+            "target.macros_add": ["MCUBOOT_HAVE_LOGGING", "NDEBUG"],
+            "mcuboot.log-level": "MCUBOOT_LOG_LEVEL_INFO",
             "mbed-trace.enable": true,
-            "mbed-trace.max-level": "TRACE_LEVEL_DEBUG",
+            "mbed-trace.max-level": "TRACE_LEVEL_INFO",
             "mbed-trace.fea-ipv6": false
+        },
+        "NUMAKER_IOT_M467": {
+            "target.restrict_size"                      : "0x10000",
+            "target.extra_labels_remove"                : ["PSA"],
+            "target.device_has_remove"                  : ["LPTICKER"],
+            "target.macros_remove"                      : ["MBEDTLS_CONFIG_HW_SUPPORT"]
+        },
+        "NUMAKER_IOT_M467_FLASHIAP": {
+            "mcuboot.primary-slot-address"              : "0x10000",
+            "mcuboot.slot-size"                         : "0x73000",
+            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-size"                      : "0x2000",
+            "mcuboot.max-img-sectors"                   : "0x73",
+            "mcuboot.read-granularity"                  : 4
+        },
+        "NUMAKER_IOT_M467_FLASHIAP_TEST": {
+            "mcuboot.slot-size"                         : "0x4C000"
+        },
+        "NUMAKER_IOT_M467_SPIF": {
+            "mcuboot.primary-slot-address"              : "0x10000",
+            "mcuboot.slot-size"                         : "0xE6000",
+            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-size"                      : "0x2000",
+            "mcuboot.max-img-sectors"                   : "0xE6",
+            "mcuboot.read-granularity"                  : 4,
+            "target.components_add"                     : ["SPIF"],
+            "spif-driver.SPI_MOSI"                      : "PJ_1",
+            "spif-driver.SPI_MISO"                      : "PJ_0",
+            "spif-driver.SPI_CLK"                       : "PI_15",
+            "spif-driver.SPI_CS"                        : "PI_14"
+        },
+        "NUMAKER_IOT_M467_SPIF_TEST": {
+            "mcuboot.slot-size"                         : "0x73000"
+        },
+        "NUMAKER_IOT_M467_NUSD": {
+            "mcuboot.primary-slot-address"              : "0x10000",
+            "mcuboot.slot-size"                         : "0xE6000",
+            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-size"                      : "0x2000",
+            "mcuboot.max-img-sectors"                   : "0xE6",
+            "mcuboot.read-granularity"                  : 4,
+            "target.components_add"                     : ["NUSD"]
+        },
+        "NUMAKER_IOT_M467_NUSD_TEST": {
+            "mcuboot.slot-size"                         : "0x73000"
+        },
+        "NUMAKER_IOT_M487": {
+            "target.restrict_size"                      : "0x10000",
+            "target.extra_labels_remove"                : ["PSA"],
+            "target.device_has_remove"                  : ["LPTICKER"],
+            "target.macros_remove"                      : ["MBEDTLS_CONFIG_HW_SUPPORT"]
+        },
+        "NUMAKER_IOT_M487_SPIF": {
+            "mcuboot.primary-slot-address"              : "0x10000",
+            "mcuboot.slot-size"                         : "0x66000",
+            "mcuboot.scratch-address"                   : "0x7E000",
+            "mcuboot.scratch-size"                      : "0x2000",
+            "mcuboot.max-img-sectors"                   : "0x66",
+            "mcuboot.read-granularity"                  : 4,
+            "target.components_add"                     : ["SPIF"],
+            "spif-driver.SPI_MOSI"                      : "PC_0",
+            "spif-driver.SPI_MISO"                      : "PC_1",
+            "spif-driver.SPI_CLK"                       : "PC_2",
+            "spif-driver.SPI_CS"                        : "PC_3"
+        },
+        "NUMAKER_IOT_M487_SPIF_TEST": {
+            "mcuboot.slot-size"                         : "0x33000"
+        },
+        "NUMAKER_IOT_M487_NUSD": {
+            "mcuboot.primary-slot-address"              : "0x10000",
+            "mcuboot.slot-size"                         : "0x66000",
+            "mcuboot.scratch-address"                   : "0x7E000",
+            "mcuboot.scratch-size"                      : "0x2000",
+            "mcuboot.max-img-sectors"                   : "0x66",
+            "mcuboot.read-granularity"                  : 4,
+            "target.components_add"                     : ["NUSD"]
+        },
+        "NUMAKER_IOT_M487_NUSD_TEST": {
+            "mcuboot.slot-size"                         : "0x33000"
         },
         "NRF52840_DK": {
             "target.features_remove": ["CRYPTOCELL310"],

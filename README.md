@@ -3,6 +3,8 @@ Demo of mcuboot with Mbed-OS
 
 This application builds as a bootloader and should be built with the [corresponding bootable blinky demo application](https://github.com/AGlass0fMilk/mbed-mcuboot-blinky).
 
+> **_NOTE:_** For getting started with Nuvoton Mbed-Enabled platform, navigate [Nuvoton quick-start](./NUVOTON_QUICK_START.md).
+
 ## Overview
 
 Go to the [mcuboot repository](https://github.com/mcu-tools/mcuboot) for more information on mcuboot and how to configure it. This section will only cover topics specific to the mbed-os implementation.
