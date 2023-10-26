@@ -88,6 +88,10 @@ mbed::BlockDevice* get_secondary_bd(void) {
        TARGET_NUMAKER_IOT_M467_FLASHIAP_TEST
     static FlashIAPBlockDevice fbd(MCUBOOT_PRIMARY_SLOT_START_ADDR + MCUBOOT_SLOT_SIZE, MCUBOOT_SLOT_SIZE);
     return &fbd;
+#   elif TARGET_NUMAKER_IOT_M467_FLASHIAP_DUALBANK || \
+       TARGET_NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
+    static FlashIAPBlockDevice fbd(0x80000, MCUBOOT_SLOT_SIZE);
+    return &fbd;
 #   elif TARGET_NUMAKER_IOT_M467_SPIF || \
          TARGET_NUMAKER_IOT_M467_SPIF_TEST
     /* Whether or not QE bit is set, explicitly disable WP/HOLD functions for safe. */

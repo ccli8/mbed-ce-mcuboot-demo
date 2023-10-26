@@ -37,6 +37,17 @@
         "NUMAKER_IOT_M467_FLASHIAP_TEST": {
             "mcuboot.slot-size"                         : "0x4C000"
         },
+        "NUMAKER_IOT_M467_FLASHIAP_DUALBANK": {
+            "mcuboot.primary-slot-address"              : "0x10000",
+            "mcuboot.slot-size"                         : "0x70000",
+            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-size"                      : "0x2000",
+            "mcuboot.max-img-sectors"                   : "0x70",
+            "mcuboot.read-granularity"                  : 4
+        },
+        "NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST": {
+            "mcuboot.slot-size"                         : "0x38000"
+        },
         "NUMAKER_IOT_M467_SPIF": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0xE6000",

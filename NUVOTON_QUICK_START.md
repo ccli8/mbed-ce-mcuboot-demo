@@ -24,6 +24,8 @@ Choose one of them for demo in the following.
 
 -   NUMAKER_IOT_M467_FLASHIAP
 -   NUMAKER_IOT_M467_FLASHIAP_TEST
+-   NUMAKER_IOT_M467_FLASHIAP_DUALBANK
+-   NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
 -   NUMAKER_IOT_M467_SPIF
 -   NUMAKER_IOT_M467_SPIF_TEST
 -   NUMAKER_IOT_M467_NUSD
@@ -39,7 +41,9 @@ Only use targets in the support list.
 > **_NOTE:_** Targets whose names have `TEST` are for test.
 Their internal flash maps are designed to support firmware upgrade in-place, without real OTA download process.
 
-> **_NOTE:_** Targets whose names have `FLASHIAP` locate secondary slot at internal flash, usually immediately in back of primary slot.
+> **_NOTE:_** Targets whose names have `FLASHIAP` locate secondary slot at internal flash, usually (immediately) in back of primary slot.
+
+> **_NOTE:_** Targets whose names have `FLASHIAP_DUALBANK` locate secondary slot at second bank of internal flash. This is to enable **RWW** (**Read While Write**), that is, code on first bank can still be running (read operation) while update image is being written to second bank (write operation).
 
 > **_NOTE:_** Targets whose names have `SPIF` locate secondary slot at external SPI flash.
 
@@ -213,9 +217,15 @@ Immediately following primary slot are optional secondary slot and then optional
 
 ## Demonstrating firmware upgrade process with MCUboot
 
-In the chapter, we choose the target `NUMAKER_IOT_M487_SPIF_TEST` for demonstrating firmware upgrade process with MCUboot,
-which locates secondary slot at external SPI flash,
-and adjusts primary/secondary slot size to support firmware upgrade in-place.
+In the chapter, we choose the following targets for demonstrating firmware upgrade process with MCUboot.
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    locates secondary slot at external SPI flash and adjusts primary/secondary slot size to support firmware upgrade in-place.
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    Locates secondary slot at second bank of internal flash and adjusts primary/secondary slot size to support firmware upgrade in-place.
 
 ### Building MCUboot bootloader
 
@@ -239,9 +249,18 @@ $ pip install -r mcuboot/scripts/requirements.txt
 ```
 
 Build `mbed-mcuboot-demo`:
-```
-mbed compile -m NUMAKER_IOT_M487_SPIF_TEST -t GCC_ARM
-```
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ mbed compile -m NUMAKER_IOT_M487_SPIF_TEST -t GCC_ARM
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ mbed compile -m NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST -t GCC_ARM
+    ```
 
 ### Building MCUboot-enabled application
 
@@ -259,52 +278,141 @@ Install dependent modules:
 $ mbed deploy
 ```
 
+Configure MCUboot image format, which must be consistent with signing through imgtool:
+
+-   MCUboot image has no trailer:
+
+    **mbed_app.json**:
+    ```json
+    "has-image-trailer"                         : false,
+    "has-image-confirmed"                       : false,
+    ```
+
+-   MCUboot image has trailer added through imgtool --pad parameter in signing:
+
+    **mbed_app.json**:
+    ```json
+    "has-image-trailer"                         : true,
+    "has-image-confirmed"                       : false,
+    ```
+
+-   MCUboot image has confirmed through imgtool --confirm parameter in signing:
+
+    **mbed_app.json**:
+    ```json
+    "has-image-confirmed"                       : true,
+    ```
+
+> **_NOTE:_** imgtool `--confirm` implies imgtool `--pad`.
+
 Build `mbed-mcuboot-blinky`:
-```
-mbed compile -m NUMAKER_IOT_M487_SPIF_TEST -t GCC_ARM
-```
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ mbed compile -m NUMAKER_IOT_M487_SPIF_TEST -t GCC_ARM
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ mbed compile -m NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST -t GCC_ARM
+    ```
 
 Sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.0_signed.bin` for first version:
-```
-$ imgtool sign \
--k signing-keys.pem \
---align 4 \
--v 1.0.0+0 \
---header-size 4096 \
---pad-header \
--S 0x33000 \
-BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
-BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin
-```
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.0+0 \
+    --header-size 4096 \
+    --pad-header \
+    -S 0x33000 \
+    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
+    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.0+0 \
+    --header-size 4096 \
+    --pad-header \
+    --confirm \
+    -S 0x38000 \
+    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
+    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin
+    ```
 
 > **_NOTE:_** `-k signing-keys.pem` is to specify signing key.
 
 > **_NOTE:_** `--header-size 4096` and `--pad-header` are to specify reserved image header size,
 which is (`target.mbed_app_start` - `mcuboot.primary-slot-address`).
 
-> **_NOTE:_** `-S 0x33000` is to specify primary/secondary slot size `mcuboot.slot-size`.
+> **_NOTE:_** `-S` is to specify primary/secondary slot size `mcuboot.slot-size`.
+
+> **_NOTE:_** On `has-image-trailer` set to `true`, also add `--pad` to meet the configuration. This adds trailer to the MCUboot image so that it is immediately update-able when flashed to secondary slot, without need to invoke `boot_set_pending` at run-time.
+
+> **_NOTE:_** On `has-image-confirmed` set to `true`, also add `--confirm` to meet the configuration. Implying above, this marks the image as confirmed and so image revert is disabled.
 
 Then sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.1_signed.bin` for second version:
-```
-$ imgtool sign \
--k signing-keys.pem \
---align 4 \
--v 1.0.1+0 \
---header-size 4096 \
---pad-header \
--S 0x33000 \
-BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
-BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin
-```
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.1+0 \
+    --header-size 4096 \
+    --pad-header \
+    -S 0x33000 \
+    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
+    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.1+0 \
+    --header-size 4096 \
+    --pad-header \
+    --confirm \
+    -S 0x38000 \
+    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
+    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin
+    ```
 
 Combine `mbed-mcuboot-demo.bin`, `mbed-mcuboot-blinky_V1.0.0_signed.bin`, and `mbed-mcuboot-blinky_V1.0.1_signed.bin`.
-```
-$ srec_cat \
-../mbed-mcuboot-demo/BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-demo.bin -Binary -offset 0x0 \
-BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
-BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0x43000 \
--o BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_merged.hex -Intel
-```
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ srec_cat \
+    ../mbed-mcuboot-demo/BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-demo.bin -Binary -offset 0x0 \
+    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
+    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0x43000 \
+    -o BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_merged.hex -Intel
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ srec_cat \
+    ../mbed-mcuboot-demo/BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-demo.bin -Binary -offset 0x0 \
+    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
+    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0xB8000 \
+    -o BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_merged.hex -Intel
+    ```
 
 > **_NOTE:_** Assume `mbed-mcuboot-demo`/`mbed-mcuboot-blinky` repositories are cloned into the same directory,
 so that we can reference `mbed-mcuboot-demo` repository as above.
@@ -313,12 +421,11 @@ so that we can reference `mbed-mcuboot-demo` repository as above.
 
 > **_NOTE:_** `-offset 0x10000` is to specify start address of primary slot where `mbed-mcuboot-blinky_V1.0.0_signed.bin` resides.
 
-> **_NOTE:_** `-offset 0x43000` is to specify start address of OTA download simulate slot where `mbed-mcuboot-blinky_V1.0.1_signed.bin` resides.
+> **_NOTE:_** `-offset 0x43000` or `-offset 0xB8000` is to specify start address of OTA download simulate slot where `mbed-mcuboot-blinky_V1.0.1_signed.bin` resides.
 
-> **_NOTE:_** For pre-flash, it is unnecessary to combine secondary slot.
-Update firmware will update to it from OTA download simulate slot at run-time.
+> **_NOTE:_** For pre-flash, it is unnecessary to combine secondary slot. Update firmware will update to it from OTA download simulate slot at run-time.
 
-Finally, drag-n-drop `mbed-mcuboot-blinky_merged.hex` onto NuMaker-IoT-M487 board for flashing.
+Finally, drag-n-drop `mbed-mcuboot-blinky_merged.hex` onto target board for flashing.
 
 ### Monitoring firmware upgrade process through host console
 
@@ -331,13 +438,14 @@ At first boot, notice:
 
 ```
 [INFO][BL]: Starting MCUboot
-[INFO][MCUb]: Primary image: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
+[INFO][MCUb]: Primary image: ......
 [INFO][MCUb]: Scratch: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
 [INFO][MCUb]: Boot source: primary slot
 [INFO][MCUb]: Swap type: none
 [INFO][BL]: Booting firmware image at 0x11000
+```
 
-[INFO][main]: Boot confirmed
+```
 [INFO][main]: Hello version 1.0.0+0
 [INFO][main]: > Press button to erase secondary slot
 ```
@@ -347,40 +455,48 @@ Press `BUTTON1` to erase secondary slot:
 [INFO][main]: Secondary BlockDevice inited
 [INFO][main]: Erasing secondary BlockDevice...
 [INFO][main]: Secondary BlockDevice erased
-[INFO][main]: > Press button to copy update image to secondary BlockDevice
 ```
 
 Press `BUTTON1` to copy `mbed-mcuboot-blinky_V1.0.1_signed.bin` from OTA download simulate slot to secondary slot:
 ```
+[INFO][main]: > Press button to copy update image to secondary BlockDevice
 [INFO][main]: FlashIAPBlockDevice inited
-[INFO][main]: > Image copied to secondary BlockDevice, press button to activate
 ```
 
-Press `BUTTON1` to activate `mbed-mcuboot-blinky_V1.0.1_signed.bin` in secondary slot (`boot_set_pending(false)`):
+With neither `has-image-trailer` nor `has-image-confirmed` set to `true`, press `BUTTON1` to activate `mbed-mcuboot-blinky_V1.0.1_signed.bin` in secondary slot (`boot_set_pending(false)`):
 ```
+[INFO][main]: > Image copied to secondary BlockDevice, press button to activate
 [INFO][main]: > Secondary image pending, reboot to update
 ```
 
-> **_NOTE:_** Secondary slot is marked pending through `boot_set_pending(permanent)`.
-If `permanent` is `false`, firmware upgrade rollback is enabled, or it is permanent firmware upgrade.
+Otherwise, go reboot:
+```
+[INFO][main]: > Image copied to secondary BlockDevice, reboot to update
+```
 
 Press `RESET` to reboot...
 
 At second boot, notice:
 
-1.  There is firmware upgrade for test-run (`Swap type: test` instead of `Swap type: perm`).
+1.  There is firmware upgrade for test-run (`Swap type: test`) or permanently (`Swap type: perm`).
 1.  Firmware version updates to `V1.0.1` (`Hello version 1.0.1+0`).
-1.  Above firmware upgrade is then marked confirmed (`boot_set_confirmed()`), so there won't be firmware upgrade rollback at next boot.
+1.  With `has-image-confirmed` not set to `true`, image is confirmed `boot_set_confirmed()`, so there won't be firmware upgrade rollback at next boot.
 ```
 [INFO][BL]: Starting MCUboot
-[INFO][MCUb]: Primary image: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
+[INFO][MCUb]: Primary image: ......
 [INFO][MCUb]: Scratch: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
 [INFO][MCUb]: Boot source: primary slot
-[INFO][MCUb]: Swap type: test
+[INFO][MCUb]: Swap type: test or perm
 [INFO][MCUb]: Starting swap using scratch algorithm.
 [INFO][BL]: Booting firmware image at 0x11000
+```
 
+With `has-image-confirmed` not set to `true`, image is confirmed:
+```
 [INFO][main]: Boot confirmed
+```
+
+```
 [INFO][main]: Hello version 1.0.1+0
 [INFO][main]: > Press button to erase secondary slot
 ```
@@ -389,17 +505,16 @@ We don't re-play firmware upgrade process. Press `RESET` to reboot...
 
 At third boot, notice:
 
-1.  There is no firmware upgrade rollback due to confirmed at previous boot (`Swap type: none` instead of `Swap type: revert`).
+1.  There is no firmware upgrade rollback (`Swap type: none`) due to confirmed at the very start (`has-image-confirmed` set to `true`) or at previous boot (`boot_set_confirmed()`).
 1.  Firmware version keeps as updated `V1.0.1` (`Hello version 1.0.1+0`).
 ```
 [INFO][BL]: Starting MCUboot
-[INFO][MCUb]: Primary image: magic=good, swap_type=0x2, copy_done=0x1, image_ok=0x1
+[INFO][MCUb]: Primary image: ......
 [INFO][MCUb]: Scratch: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
 [INFO][MCUb]: Boot source: none
 [INFO][MCUb]: Swap type: none
 [INFO][BL]: Booting firmware image at 0x11000
 
-[INFO][main]: Boot confirmed
 [INFO][main]: Hello version 1.0.1+0
 [INFO][main]: > Press button to erase secondary slot
 ```
@@ -412,13 +527,13 @@ In the section, advanced topics are addressed here.
 
 ### Changing signing keys
 
-Default signing keys are placed in `mbed-mcuboot-demo` repository and synchronized to `mbed-mcuboot-blinky` repository.
+Default signing keys, using RSA, are placed in `mbed-mcuboot-demo` repository and synchronized to `mbed-mcuboot-blinky` repository.
 They are exclusively for development and cannot for production.
-In the following, we guide how to change the signing keys.
+In the following, we guide how to change the signature algorithm to ECDSA:
 
-1.  In `mbed-mcuboot-demo` repository, generate an RSA 2048 key pair:
+1.  In `mbed-mcuboot-demo` repository, generate an ECDSA key pair:
     ```
-    $ imgtool keygen -k signing-keys.pem -t rsa-2048
+    $ imgtool keygen -k signing-keys.pem -t ecdsa-p256
     ```
 
 1. Extract the public key into a C data structure:
@@ -427,6 +542,32 @@ In the following, we guide how to change the signing keys.
     ```
 
 1. Synchronize `signing-keys.pem` and `signing_keys.c` to `mbed-mcuboot-blinky` repository.
+
+1. In both `mbed-mcuboot-demo` and `mbed-mcuboot-blinky` repositories, change signature algorithm to ECDSA:
+    **mbed_app.json**:
+    ```json
+    "mcuboot.signature-algorithm": "SIGNATURE_TYPE_EC256",
+    ```
+
+1. Rebuild.
+
+### Enable downgrade prevention
+
+According to [MCUboot downgrade prevention](https://docs.mcuboot.com/design.html#downgrade-prevention),
+-   **Software-based downgrade prevention** is only available when the overwrite-based image update strategy is used.
+-   **Hardware-based downgrade prevention** is available without dependency on particular image update strategy.
+
+In this port, **hardware-based downgrade prevention** is not supported.
+In the following, we guide how to enable  **software-based downgrade prevention**:
+
+1. In both `mbed-mcuboot-demo` and `mbed-mcuboot-blinky` repositories, change image update strategy to overwrite-only and enable downgrade prevention:
+    **mbed_app.json**:
+    ```json
+    "mcuboot.overwrite-only": true,
+    "mcuboot.downgrade-prevention": true,
+    ```
+
+1. Rebuild.
 
 ### Support new target
 
