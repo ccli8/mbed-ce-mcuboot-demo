@@ -64,6 +64,23 @@
         "NUMAKER_IOT_M467_SPIF_TEST": {
             "mcuboot.slot-size"                         : "0x73000"
         },
+        "NUMAKER_IOT_M467_SPIF_BOOT80K": {
+            "target.restrict_size"                      : "0x14000",
+            "mcuboot.primary-slot-address"              : "0x14000",
+            "mcuboot.slot-size"                         : "0xE2000",
+            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-size"                      : "0x2000",
+            "mcuboot.max-img-sectors"                   : "0xE2",
+            "mcuboot.read-granularity"                  : 4,
+            "target.components_add"                     : ["SPIF"],
+            "spif-driver.SPI_MOSI"                      : "PJ_1",
+            "spif-driver.SPI_MISO"                      : "PJ_0",
+            "spif-driver.SPI_CLK"                       : "PI_15",
+            "spif-driver.SPI_CS"                        : "PI_14"
+        },
+        "NUMAKER_IOT_M467_SPIF_BOOT80K_TEST": {
+            "mcuboot.slot-size"                         : "0x70000"
+        },
         "NUMAKER_IOT_M467_NUSD": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0xE6000",
