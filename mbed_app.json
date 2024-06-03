@@ -29,7 +29,7 @@
         "NUMAKER_IOT_M467_FLASHIAP": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0x73000",
-            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-address"                   : "0xFD000",
             "mcuboot.scratch-size"                      : "0x2000",
             "mcuboot.max-img-sectors"                   : "0x73",
             "mcuboot.read-granularity"                  : 4
@@ -40,7 +40,7 @@
         "NUMAKER_IOT_M467_FLASHIAP_DUALBANK": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0x70000",
-            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-address"                   : "0xFD000",
             "mcuboot.scratch-size"                      : "0x2000",
             "mcuboot.max-img-sectors"                   : "0x70",
             "mcuboot.read-granularity"                  : 4
@@ -51,7 +51,7 @@
         "NUMAKER_IOT_M467_SPIF": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0xE6000",
-            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-address"                   : "0xFD000",
             "mcuboot.scratch-size"                      : "0x2000",
             "mcuboot.max-img-sectors"                   : "0xE6",
             "mcuboot.read-granularity"                  : 4,
@@ -68,7 +68,7 @@
             "target.restrict_size"                      : "0x14000",
             "mcuboot.primary-slot-address"              : "0x14000",
             "mcuboot.slot-size"                         : "0xE2000",
-            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-address"                   : "0xFD000",
             "mcuboot.scratch-size"                      : "0x2000",
             "mcuboot.max-img-sectors"                   : "0xE2",
             "mcuboot.read-granularity"                  : 4,
@@ -84,7 +84,7 @@
         "NUMAKER_IOT_M467_NUSD": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0xE6000",
-            "mcuboot.scratch-address"                   : "0xFE000",
+            "mcuboot.scratch-address"                   : "0xFD000",
             "mcuboot.scratch-size"                      : "0x2000",
             "mcuboot.max-img-sectors"                   : "0xE6",
             "mcuboot.read-granularity"                  : 4,
@@ -102,7 +102,7 @@
         "NUMAKER_IOT_M487_SPIF": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0x66000",
-            "mcuboot.scratch-address"                   : "0x7E000",
+            "mcuboot.scratch-address"                   : "0x7D000",
             "mcuboot.scratch-size"                      : "0x2000",
             "mcuboot.max-img-sectors"                   : "0x66",
             "mcuboot.read-granularity"                  : 4,
@@ -118,7 +118,7 @@
         "NUMAKER_IOT_M487_NUSD": {
             "mcuboot.primary-slot-address"              : "0x10000",
             "mcuboot.slot-size"                         : "0x66000",
-            "mcuboot.scratch-address"                   : "0x7E000",
+            "mcuboot.scratch-address"                   : "0x7D000",
             "mcuboot.scratch-size"                      : "0x2000",
             "mcuboot.max-img-sectors"                   : "0x66",
             "mcuboot.read-granularity"                  : 4,
