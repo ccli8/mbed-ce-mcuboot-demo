@@ -1,450 +1,566 @@
-# mbed-mcuboot-demo
-Demo of mcuboot with Mbed-OS
+# Getting started with MCUboot for Nuvoton Mbed CE enabled platform
 
-This application builds as a bootloader and should be built with the [corresponding bootable blinky demo application](https://github.com/AGlass0fMilk/mbed-mcuboot-blinky).
+[MCUboot](https://www.mcuboot.com/) is a secure bootloader for 32-bits micro-controllers.
+There has been an [MCUboot port for Mbed OS](https://docs.mcuboot.com/readme-mbed.html).
+[mbed-mcuboot-demo](https://github.com/AGlass0fMilk/mbed-mcuboot-demo) and
+[mbed-mcuboot-blinky](https://github.com/AGlass0fMilk/mbed-mcuboot-blinky)
+are created to demo MCUboot with Mbed OS.
 
-> **_NOTE:_** For getting started with Nuvoton Mbed-Enabled platform, navigate [Nuvoton quick-start](./NUVOTON_QUICK_START.md).
+Based on above work, this document gets you started with MCUboot for Nuvoton Mbed-Enabled platform.
+It walks you through:
 
-## Overview
+-   Constructing one reference MCUboot port for [Mbed CE](https://github.com/mbed-ce) build environment on Windows
+-   Demonstrating firmware upgrade process with MCUboot for Nuvoton's platform
 
-Go to the [mcuboot repository](https://github.com/mcu-tools/mcuboot) for more information on mcuboot and how to configure it. This section will only cover topics specific to the mbed-os implementation.
+## Hardware requirements
 
-## Memory Regions Overview
+-   [NuMaker-IoT-M467 board](https://www.nuvoton.com/board/numaker-iot-m467/)
+-   [NuMaker-IoT-M487 board](https://www.nuvoton.com/products/iot-solution/iot-platform/numaker-iot-m487/)
 
-The diagram below shows the default memory map configuration used for this mcuboot demo on the nRF52840. The nRF52840 has a total of 1MB of internal program flash. The following sections detail how the bounds of each memory region is configured.
+Currently, Nuvoton-forked `mbed-ce-mcuboot-demo`/`mbed-ce-mcuboot-blinky` repositories support above boards.
+Choose one of them for demo in the following.
 
-![nRF52840-mcuboot-map](assets/nRF52840-mcuboot-map.png)
+### Support targets
 
-### Bootloader
-The bootloader (the application in this repository) lives in the first region of flash where the processor begins execution. The basic mcuboot bootloader does not implement any interfaces to receive updates. It simply looks at available application "slots". The application (or another bootloader) is responsible for loading application updates into a slot visible to the mcuboot bootloader. Update candidates are typically placed in the "secondary" flash region.
+-   NUMAKER_IOT_M467_FLASHIAP
+-   NUMAKER_IOT_M467_FLASHIAP_TEST
+-   NUMAKER_IOT_M467_FLASHIAP_DUALBANK
+-   NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
+-   NUMAKER_IOT_M467_SPIF
+-   NUMAKER_IOT_M467_SPIF_TEST
+-   NUMAKER_IOT_M467_NUSD
+-   NUMAKER_IOT_M467_NUSD_TEST
+-   NUMAKER_IOT_M487_SPIF
+-   NUMAKER_IOT_M487_SPIF_TEST
+-   NUMAKER_IOT_M487_NUSD
+-   NUMAKER_IOT_M487_NUSD_TEST
 
-The bootloader has a maximum size set by `target.restrict_size`. In this example the bootloader is restricted to a size of `0x20000` bytes. This is way larger than required but allows the bootloader to be built with a debug profile during development. In production the bootloader size should be optimized based on your use case.
+> **_NOTE:_** **DO NOT** use standard targets like NUMAKER_IOT_M467/NUMAKER_IOT_M487.
+Only use targets in the support list.
 
-Upon bootup, mcuboot looks at two memory regions, one called the "primary slot" and the other called the "secondary slot", to determine if a firmware update is available and should be installed.
+> **_NOTE:_** Targets whose names have `TEST` are for test.
+Their internal flash maps are designed to support firmware upgrade in-place, without real OTA download process.
 
-### Primary Slot Region
+> **_NOTE:_** Targets whose names have `FLASHIAP` locate secondary slot at internal flash, usually (immediately) in back of primary slot.
 
-The **"primary slot"** region is typically located immediately following the end of the bootloader. The starting address of the primary slot can be configured using the parameter `mcuboot.primary-slot-address`. The primary slot begins with the application header and contains the bootable main application and trailer info. 
+> **_NOTE:_** Targets whose names have `FLASHIAP_DUALBANK` locate secondary slot at second bank of internal flash. This is to enable **RWW** (**Read While Write**), that is, code on first bank can still be running (read operation) while update image is being written to second bank (write operation).
 
-The primary slot typically ends where the "mcuboot scratch region" begins (see Scratch Space Region below). The size (and thus the end address) of the primary slot can be configured using the parameter `mcuboot.slot-size`. Note that this parameter also configures the expected size of the secondary slot region.
+> **_NOTE:_** Targets whose names have `SPIF` locate secondary slot at external SPI flash.
 
-**Note:** If your application uses internal flash for data storage (eg: KVStore), you must carefully configure the memory regions allocated to the primary slot, the scratch region, and your application to ensure there are no conflicts.
+> **_NOTE:_** Targets whose names have `NUSD` locate secondary slot at SD card with Nuvoton's SDH peripheral. So prepare one micro SD card for these targets.
 
-#### Application Header Info
+## Software requirements
 
-The application header info section is at the beginning of the "primary memory slot".
+-   [Git](https://gitforwindows.org/)
 
-When deciding what to boot/update, the mcuboot bootloader looks at an installed application's header info, which is a special struct prepended to the application binary. It uses this header info to validate that there is a bootable image installed in the "slot".
+-   [Python3](https://www.python.org/)
 
-By default, this header is configured to be 4kB in size. This can be adjusted using the configuration parameter `mcuboot.header_size`. 
+-   [CMake](https://cmake.org/)
 
-**However,** due to the way the FlashIAP block device currently works while erasing, the header_size should be configured to be the size of an erase sector (4kB in the case of an nRF52840). Erasing using the FlashIAPBlockDevice only works if the given address is erase-sector aligned!
+-   [Ninja](https://github.com/ninja-build/ninja/releases)
 
-This header is prepended to the application binary during the signing process (explained later).
+-   [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
 
-#### Primary Application
+-   [Image tool](https://github.com/mcu-tools/mcuboot/blob/main/docs/imgtool.md)
 
-The primary application is the currently installed, bootable application. In this demo it is the `mbed-mcuboot-blinky` application. The application start address is configured using `target.mbed_app_start` and the size can be restricted using `target.mbed_app_size`. The primary application size **must** be restricted to avoid colliding with the scratch space region (if used)!
+-   [SRecord](http://srecord.sourceforge.net/)
 
-#### Application TLV Trailers
+For [VS Code development](https://github.com/mbed-ce/mbed-os/wiki/Project-Setup:-VS-Code)
+or [OpenOCD as upload method](https://github.com/mbed-ce/mbed-os/wiki/Upload-Methods#openocd),
+install below additionally:
 
-There are also type-length-value (TLV) encoded pieces of information following the application binary called the "application trailer". These TLV encoded values include things like a digital signature and SHA hash, among other things. Similar to the application header info, the TLV trailers are also appended to the application hex during signing.
+-   [NuEclipse](https://github.com/OpenNuvoton/Nuvoton_Tools#numicro-software-development-tools): Nuvoton's fork of Eclipse
 
-The space reserved for the application TLV trailers is determined from other configuration parameters. The TLV trailers reside in the memory between the **end** of the *primary application* and the **end** of the *primary slot*. 
+-   Nuvoton forked OpenOCD: Shipped with NuEclipse installation package above.
+    Checking openocd version `openocd --version`, it should fix to `0.10.022`.
 
-ie: The TLV trailers start at `target.mbed_app_start + target.mbed_app_size` and end at `mcuboot.primary-slot-address + mcuboot.slot-size`.
+## Walking through internal flash map
 
-In our case, our configuration gives us:
+The following internal flash map is common for all targets.
 
-`target.mbed_app_start + target.mbed_app_size = 0x21000 + 0xBE000 = 0xDF000 = TLV start address`
+-   MCUboot region: Area where MCUboot bootloader is located
 
-`mcuboot.primary-slot-address + mcuboot.slot-size = 0x20000 + 0xC0000 = 0xE0000 = TLV end address`
+-   Primary slot: Area where active firmware is located, consisting of image header, application, and image trailer (+ TLV)
 
-`TLV region size = 0xE0000 - 0xDF000 = 0x1000`
+    > **_NOTE:_** Refer to [image format](https://docs.mcuboot.com/design.html#image-format) for details.
 
-In most cases, 4kB will be plenty of room for the required TLV trailers. Enabling features such as update binary encryption increases the number of required TLV trailer entries and so you may need to adjust the size of the TLV trailer region based on your use case. During signing, the imgtool script will complain if there is not enough room for TLV trailers.
+-   KVStore region: Area reserved for [KVStore](https://os.mbed.com/docs/mbed-os/v6.15/apis/kvstore.html), Mbed OS's storage solution
 
-See the [mcuboot Image Trailer documentation](https://github.com/mcu-tools/mcuboot/blob/master/docs/design.md#image-trailer) for more information.
-
-### Scratch Space Region
-
-If configured as such, mcuboot can perform a "swap" update where it will copy the existing main application into the secondary memory region and the update candidate into the main application region. This allows mcuboot to revert the update in case of a serious firmware bug (ie: brick-proofs the update process). If the updated application fails to mark itself as "okay", mcuboot will revert the update upon the next boot cycle. 
-
-To perform this kind of swap update, mcuboot requires a non-volatile "scratch" space in memory to store pieces of application code and update status information. This enables mcuboot to safely continue an update/revert procedure in the event of a power loss.
-
-The scratch region starting address may be specified with the configuration parameter, `mcuboot.scratch-address`. The size of the scratch space can be configured using `mcuboot.scratch-size` -- this value **must** be erase-sector aligned (ie: a multiple of the internal flash's eraseable size).
-
-For more advanced information about configuring the scratch space region, see the [mcuboot documentation on Image Slots](https://github.com/mcu-tools/mcuboot/blob/master/docs/design.md#image-slots). For more information on swap updates, see the [mcuboot documentation on Swap Updates](https://github.com/mcu-tools/mcuboot/blob/master/docs/design.md#image-swapping)
-
-### Secondary Slot Region
-
-The **"secondary"** slot region is provided by you. Typically this is an external flash chip used for bulk data and firmware update storage.
-
-The function, `mbed::BlockDevice* get_secondary_bd(void)` declared in `secondary_bd.h`, is used by mcuboot to retrieve the `BlockDevice` instance it will use for the secondary slot. You **must** implement this function to build the bootloader _and_ the bootable application!
-
-The returned BlockDevice is expected to have a size equivalent to the configuration `mcuboot.slot-size` as mentioned previously.
-
-See the example file in this repository, `default_bd.cpp`.
-
-Since the Mbed-OS mcuboot port uses Mbed's `BlockDevice` API, there is a lot of flexibility when providing the secondary memory region. For example, you can use a `FlashIAPBlockDevice` if your application is small enough to fit two copies in the internal flash. If you also use your external flash chip for data storage you can simply wrap the whole `BlockDevice` object in a `SlicingBlockDevice` to give mcuboot access to a certain region of your external flash.
-
-## Additional Configuration
-
-There are many configuration options available in mcuboot and these are covered in mcuboot's documentation. This section will go over basic configuration that needs to be done to boot an mbed-os application with mcuboot.
-
-In the `mbed-mcuboot-blinky` repository, the mcuboot repository is included to allow the application to call some application-related mcuboot functions. One use case is having the application flag itself as "okay" after an update has occurred. This prevents mcuboot from reverting the update on the next boot.
-
-By default, the mcuboot repository/library is configured to build a bootloader, **not** an application. So when building an application with mcuboot, it is important to add the following to your `mbed_app.json` configuration file:
+-   Scratch region: Area reserved for MCUboot to execute firmware upgrade operation
 
 ```
-"mcuboot.bootloader-build": 0
+    +--------------------------+ <-+ mcuboot.scratch-address + mcuboot.scratch-size
+    | Scratch                  |
+    +--------------------------+ <-+ mcuboot.scratch-address
+    +--------------------------+ <-+ storage_tdb_internal.internal_base_address +
+    | KVStore                  |     storage_tdb_internal.internal_size
+    +--------------------------+ <-+ storage_tdb_internal.internal_base_address
+    +--------------------------+
+    | Optional OTA download    |
+    | simulate slot            |
+    +--------------------------+
+    +--------------------------+
+    | Optional secondary slot  |
+    +--------------------------+
+    +--------------------------+ <-+ mcuboot.primary-slot-address + mcuboot.slot-size
+    | Primary slot             |
+    |+------------------------+|
+    || Image trailer (+ TLV)  ||
+    |+------------------------+|
+    ++------------------------+| <-+ target.mbed_app_start + target.mbed_app_size
+    |}                        ||
+    || Application            ||
+    ||                        ||
+    ++------------------------++ <-+ target.mbed_app_start
+    |+------------------------+|
+    || Image header           ||
+    |+------------------------+|
+    +--------------------------+ <-+ mcuboot.primary-slot-address
+    +--------------------------+ <-+ 0 + target.restrict_size
+    |                          |
+    | MCUboot                  |
+    |                          |
+    +--------------------------+ <-+ 0
 ```
 
-Other commonly-used configuration options are:
-```
-"target.restrict_size",
-"target.mbed_app_start",
-"target.mbed_app_size",
-"mcuboot.primary-slot-address",
-"mcuboot.slot-size",
-"mcuboot.scratch-address",
-"mcuboot.scratch-size",
-"mcuboot.header-size",
-"mcuboot.max-img-sectors",
-"mcuboot.read-granularity",
-```
+Immediately following primary slot are optional secondary slot and then optional OTA download simulate slot.
 
-Many of these have been mentioned previously. 
+-   Secondary slot: Area where update firmware is located, consisting of image header, application, and image trailer (+ TLV).
+    For target names without `FLASHIAP`, secondary slot is located at external storage.
+    
+-   OTA download simulate slot: Area reserved to support firmware upgrade in-place.
+    This is achieved by pre-flashing update firmware in this slot, without real OTA download process.
+    For target names without `TEST`, OTA download simulate slot is unnecessary.
 
-**NOTE:** It is important to ensure the `mcuboot` configuration parameters are **the same** for the bootloader and the bootable application!
-
-## Running the Demo
-
-The demo application prints the version number of the application installed in the primary slot at startup and then walks you through performing an update. After performing the update, the printed version number should change.
-
-### Required tools: before you begin
-
-It is beneficial to first install mcuboot's imgtool python command line tool:
-
-`pip3 install --user -r mcuboot/scripts/requirements.txt && python3 mcuboot/scripts/setup.py install`
-
-You should also install the python package `intelhex` if it is not already installed: 
-
-`pip install intelhex` 
-
-This python package includes several utility scripts for working with binaries and .hex files.
-
-### Creating the signing keys and building the bootloader
-
-This section will only cover steps specific to setting up this project with a signing key pair and signing a main application binary. For more advanced use cases and information, such as using alternative signing algorithms to rsa-2048, see the [mcuboot documentation on Image Signing](https://github.com/mcu-tools/mcuboot/blob/master/docs/signed_images.md#image-signing).
-
-For this project the required steps to sign an application are:
-
-1.) Generate an rsa2048 key pair: `imgtool keygen -k signing-keys.pem -t rsa-2048`
-
-2.) Extract the public key into a C data structure so it can be built into the bootloader: 
-
-`imgtool getpub -k signing-keys.pem >> signing_keys.c`
-
-**Note:** The output of this command formats the variables to a specific name that is declared as an extern in mcuboot's sources. It must **not** be modified manually.
-
-3.) Build the bootloader: `mbed compile`
-
-### Building and signing the primary application
-
-Build the main application. The corresponding main application example can be cloned from this repository: [mbed-mcuboot-blinky](https://github.com/AGlass0fMilk/mbed-mcuboot-blinky).
-
-Briefly, the commands are (from the root directory of this repository):
+> **_NOTE:_** Sizes and layouts of primary slot, secondary slot, and OTA download simulate slot are the same.
 
 ```
-git clone https://github.com/AGlass0fMilk/mbed-mcuboot-blinky.git ../mbed-mcuboot-blinky
-cd ../mbed-mcuboot-blinky
-mbed config root . && mbed deploy
-mbed compile -t GCC_ARM -m NRF52840_DK
-cp BUILD/NRF52840_DK/GCC_ARM/mbed-mcuboot-blinky.hex ../mbed-mcuboot-demo
-cd &_
+    +--------------------------+
+    | OTA download simulate    |
+    | slot        |            |
+    |+------------------------+|
+    || Image trailer (+ TLV)  ||
+    |+------------------------+|
+    ++------------------------+|
+    |}                        ||
+    || Application            ||
+    ||                        ||
+    ++------------------------++
+    |+------------------------+|
+    || Image header           ||
+    |+------------------------+|
+    +--------------------------+
+    +--------------------------+
+    | Secondary slot           |
+    |+------------------------+|
+    || Image trailer (+ TLV)  ||
+    |+------------------------+|
+    ++------------------------+|
+    |}                        ||
+    || Application            ||
+    ||                        ||
+    ++------------------------++
+    |+------------------------+|
+    || Image header           ||
+    |+------------------------+|
+    +--------------------------+
+    +--------------------------+ <-+ mcuboot.primary-slot-address + mcuboot.slot-size
+    | Primary slot             |
 ```
 
-Make sure to adjust the above commands for your target and toolchain.
+## Demonstrating firmware upgrade process with MCUboot
 
-The next step is to sign the main application binary. 
+In the chapter, we choose the following targets for demonstrating firmware upgrade process with MCUboot.
 
-**Note:** even if the internal main application is not verified (ie: the digital signature is not checked) this step **must** be performed so the appropriate application header info is prepended to the binary. mcuboot will not execute the internal main application if this header info is missing or corrupt.
+-   `NUMAKER_IOT_M487_SPIF_TEST`
 
+    locates secondary slot at external SPI flash and adjusts primary/secondary slot size to support firmware upgrade in-place.
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    Locates secondary slot at second bank of internal flash and adjusts primary/secondary slot size to support firmware upgrade in-place.
+
+### Building MCUboot bootloader
+
+In git-bash, follow the instructions below to build MCUboot bootloader.
+
+First, clone Nuvoton-forked `mbed-ce-mcuboot-demo` repository and switch to the branch `master`:
 ```
-imgtool sign -k signing-keys.pem --align 4 -v 1.2.3+4 --header-size 4096 --pad-header -S 0xC0000 --pad mbed-mcuboot-blinky.hex signed.hex
-```
-
-Explanation of each option:
-
-- `-k signing-keys.pem`: this specifies the file containing the keys used to sign/verify the application
-- `--align 4`: this lets mcuboot know the intrinsic alignment of the flash (32-bits = 4 byte alignemtn)
-- `-v 1.2.3+4`: this sets the version number of the application to 1.2.3+4 (major.minor.patch+build)
-- `--header-size 4096`: this must be the same as the value specified in `mcuboot.header-size` configuration (4096 bytes by default)
-- `--pad-header`: this tells imgtool to insert the entire header, including any necessary padding bytes.
-- `-S 0xC0000`: this specifies the maximum size of the application ("slot size"). It **must** be the same as the configured `mcuboot.slot-size`!
-- `--pad`: this should only be used for binaries you plan on initially flashing to your target at the factory. It pads the resulting binary to the slot size and adds initialized trailer TLVs. This is not needed for update binaries.
-
-
-### Creating the update binary
-
-Now you must create and flash the update binary to the target's internal flash.
-
-In real world situations, the application would use some other transport (such as UART or BLE) to load the update binary into the secondary block device directly. For the sake of simplicity, this demo simply has you program the update binary to a reserved region in the internal flash which is then copied over to the secondary slot block device.
-
-To simulate a firmware update being loaded into the secondary block device, the `mbed-mcuboot-blinky` application copies a section of internal flash located at `mcuboot.primary-slot-address + 0x40000` with a size of `0x20000` to the provided secondary slot block device.
-
-Creating the update binary is similar to how we created the initial signed primary application binary.
-
-This time though, we increment the version number and reduce the slot size padding so the resulting update binary is as small as possible. This helps improve update speeds when performing updates over a real transport (UART, BLE, Cellular, etc).
-
-To figure out the minimum slot size padding to be used we will use the `hexinfo.py` utility provided by the `intelhex` package. 
-
-Execute the following: `hexinfo.py mbed-mcuboot-blinky.hex`.
-
-You should see output similar to the following:
-
-```
-- file: 'mbed-mcuboot-blinky.hex'
-  data:
-  - { first: 0x00021000, last: 0x0002F67B, length: 0x0000E67C }
+$ git clone https://github.com/mbed-nuvoton/mbed-ce-mcuboot-demo
+$ cd mbed-ce-mcuboot-demo
+$ git checkout -f master
 ```
 
-This tells us the total size of our application is `0xE67C`. The minimum slot size padding can then be determined by rounding this size up to the nearest erase sector size (for nRF52840 this is 4kB, or `0x1000`):
-
-`0xE67C rounded up to nearest 0x1000 = 0xF000`
-
-Then, we must add one more erase sector to this rounded up value to give us our minimum slot size padding:
-
-`0xF000 + 0x1000 = 0x10000`
-
-To create the update binary, you must first sign the application as we did before (using the new version number and slot padding size):
-
+Install dependent modules:
 ```
-imgtool sign -k signing-keys.pem --align 4 -v 1.2.3+5 --header-size 4096 --pad-header -S 0x10000 mbed-mcuboot-blinky.hex signed-update.hex
+$ git submodule update --init
+```
+Or for fast install:
+```
+$ git submodule update --init --filter=blob:none
 ```
 
-This will create a signed update hex called `signed-update.hex`. 
-
-The start address of the `signed-update.hex` is still at `mcuboot.primary-slot-address`. To place the update binary in the reserved memory region we will have to shift the start address of this hex file. If you're using GCC, this can be done with the following command:
-
+If `imgtool` hasn't installed yet, install it. This finalizes software requirements:
 ```
-arm-none-eabi-objcopy --change-addresses 0x40000 signed-update.hex signed-update.hex
+$ pip install -r mcuboot/scripts/requirements.txt
 ```
 
-This will overwrite the original `signed-update.hex` with one that has a starting address shifted up by `0x40000`
+Build `mbed-ce-mcuboot-demo`:
 
-Other toolchains will have a similar utility to perform this step.
+-   `NUMAKER_IOT_M487_SPIF_TEST`
 
-### Merging it all together
+    ```
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M487_SPIF_TEST
+    $ ninja
+    $ cd ..
+    ```
 
-To be able to drag-and-drop program the whole demo together, it is necessary to merge all the hex files we created in the last steps together.
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
 
-At this step, you should have created three hex files:
-- mbed-mcuboot-demo.hex (the bootloader)
-- signed.hex (the initial signed primary application)
-- update-signed.hex (the signed update application)
+    ```
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
+    $ ninja
+    $ cd ..
+    ```
 
-To merge these three hex files together we will use the `hexmerge.py` utility from the `intelhex` package:
+### Building MCUboot-enabled application
 
+In git-bash, follow the instructions below to build MCUboot-enabled application.
+
+Clone Nuvoton-forked `mbed-ce-mcuboot-blinky` repository and switch to the branch `master`:
 ```
-hexmerge.py -o merged.hex --no-start-addr BUILD/NRF52840_DK/GCC_ARM/mbed-mcuboot-demo.hex signed.hex signed-update.hex
-```
-
-This will merge the above three hex files into one called `merged.hex`. If you execute: `hexinfo.py merged.hex` you should see output similar to the following:
-
-```
-- file: 'merged.hex'
-  data:
-  - { first: 0x00000000, last: 0x0000F5C7, length: 0x0000F5C8 }
-  - { first: 0x00020000, last: 0x0002F7CB, length: 0x0000F7CC }
-  - { first: 0x00060000, last: 0x0006F7CB, length: 0x0000F7CC }
-```
-
-This confirms that the three hex files have been merged together.
-
-**Note:** In real world cases, your update mechanism may require a raw binary file. The hex can be converted to a raw binary with the following command:
-
-```
-arm-none-eabi-objcopy -I ihex -O binary signed-update.hex signed-update.bin
+$ git clone https://github.com/mbed-nuvoton/mbed-ce-mcuboot-blinky
+$ cd mbed-ce-mcuboot-blinky
+$ git checkout -f master
 ```
 
-### Start the demo
+Install dependent modules:
+```
+$ git submodule update --init
+```
+Or for fast install:
+```
+$ git submodule update --init --filter=blob:none
+```
 
-Program your Mbed board with the `merged.hex` file generated in the previous step. You can simply drag-and-drop the `merged.hex` file to the removable drive that shows up when you plug in your Mbed board.
+Configure MCUboot image format, which must be consistent with signing through imgtool:
 
-Once your target has been programmed, open a serial terminal to view the debug output of the board: `mbed sterm`. Reset the board and you should see output similar to the following:
+-   MCUboot image has no trailer:
+
+    **mbed_app.json5**:
+    ```json5
+    "has-image-trailer"                         : false,
+    "has-image-confirmed"                       : false,
+    ```
+
+-   MCUboot image has trailer added through imgtool --pad parameter in signing:
+
+    **mbed_app.json5**:
+    ```json5
+    "has-image-trailer"                         : true,
+    "has-image-confirmed"                       : false,
+    ```
+
+-   MCUboot image has confirmed through imgtool --confirm parameter in signing:
+
+    **mbed_app.json5**:
+    ```json5
+    "has-image-confirmed"                       : true,
+    ```
+
+> **_NOTE:_** imgtool `--confirm` implies imgtool `--pad`.
+
+Build `mbed-ce-mcuboot-blinky`:
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M487_SPIF_TEST
+    $ ninja
+    $ cd ..
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
+    $ ninja
+    $ cd ..
+    ```
+
+Sign `mbed-ce-mcuboot-blinky.bin` to `mbed-ce-mcuboot-blinky_V1.0.0_signed.bin` for first version:
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.0+0 \
+    --header-size 4096 \
+    --pad-header \
+    -S 0x33000 \
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.0+0 \
+    --header-size 4096 \
+    --pad-header \
+    --confirm \
+    -S 0x38000 \
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin
+    ```
+
+> **_NOTE:_** `-k signing-keys.pem` is to specify signing key.
+
+> **_NOTE:_** `--header-size 4096` and `--pad-header` are to specify reserved image header size,
+which is (`target.mbed_app_start` - `mcuboot.primary-slot-address`).
+
+> **_NOTE:_** `-S` is to specify primary/secondary slot size `mcuboot.slot-size`.
+
+> **_NOTE:_** On `has-image-trailer` set to `true`, also add `--pad` to meet the configuration. This adds trailer to the MCUboot image so that it is immediately update-able when flashed to secondary slot, without need to invoke `boot_set_pending` at run-time.
+
+> **_NOTE:_** On `has-image-confirmed` set to `true`, also add `--confirm` to meet the configuration. Implying above, this marks the image as confirmed and so image revert is disabled.
+
+Then sign `mbed-ce-mcuboot-blinky.bin` to `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` for second version:
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.1+0 \
+    --header-size 4096 \
+    --pad-header \
+    -S 0x33000 \
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ imgtool sign \
+    -k signing-keys.pem \
+    --align 4 \
+    -v 1.0.1+0 \
+    --header-size 4096 \
+    --pad-header \
+    --confirm \
+    -S 0x38000 \
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin
+    ```
+
+Combine `mbed-ce-mcuboot-demo.bin`, `mbed-ce-mcuboot-blinky_V1.0.0_signed.bin`, and `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin`.
+
+-   `NUMAKER_IOT_M487_SPIF_TEST`
+
+    ```
+    $ srec_cat \
+    ../mbed-ce-mcuboot-demo/build/mbed-ce-mcuboot-demo.bin -Binary -offset 0x0 \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0x43000 \
+    -o build/mbed-ce-mcuboot-blinky_merged.hex -Intel
+    ```
+
+-   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
+
+    ```
+    $ srec_cat \
+    ../mbed-ce-mcuboot-demo/build/mbed-ce-mcuboot-demo.bin -Binary -offset 0x0 \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0xB8000 \
+    -o build/mbed-ce-mcuboot-blinky_merged.hex -Intel
+    ```
+
+> **_NOTE:_** Assume `mbed-ce-mcuboot-demo`/`mbed-ce-mcuboot-blinky` repositories are cloned into the same directory,
+so that we can reference `mbed-ce-mcuboot-demo` repository as above.
+
+> **_NOTE:_** `-offset 0x0` is to specify start address of MCUboot bootloader mbed-ce-mcuboot-demo.bin.
+
+> **_NOTE:_** `-offset 0x10000` is to specify start address of primary slot where `mbed-ce-mcuboot-blinky_V1.0.0_signed.bin` resides.
+
+> **_NOTE:_** `-offset 0x43000` or `-offset 0xB8000` is to specify start address of OTA download simulate slot where `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` resides.
+
+> **_NOTE:_** For pre-flash, it is unnecessary to combine secondary slot. Update firmware will update to it from OTA download simulate slot at run-time.
+
+Finally, drag-n-drop `mbed-ce-mcuboot-blinky_merged.hex` onto target board for flashing.
+
+### Monitoring firmware upgrade process through host console
+
+Configure host terminal program with **115200/8-N-1**.
+
+At first boot, notice:
+
+1.  There is no firmware upgrade (`Swap type: none`).
+1.  Firmware version is `V1.0.0` (`Hello version 1.0.0+0`).
 
 ```
--- Terminal on /dev/ttyACM1 - 9600,8,N,1 ---
 [INFO][BL]: Starting MCUboot
-[INFO][MCUb]: Primary image: magic=good, swap_type=0x2, copy_done=0x1, image_ok=0x1
+[INFO][MCUb]: Primary image: ......
 [INFO][MCUb]: Scratch: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
-[INFO][MCUb]: Boot source: none
+[INFO][MCUb]: Boot source: primary slot
 [INFO][MCUb]: Swap type: none
-[INFO][BL]: Booting firmware image at 0x21000
+[INFO][BL]: Booting firmware image at 0x11000
+```
 
-<Potentially random data from the UART>
-
-[INFO][main]: Hello version 1.2.3+4
+```
+[INFO][main]: Hello version 1.0.0+0
 [INFO][main]: > Press button to erase secondary slot
-
 ```
 
-### Erasing the secondary slot
-
-By pressing the target's button (BUTTON1, if there are multiple), you will initiate erasure of the secondary slot block device in preparation for programming the update. You should see output similar to the following:
-
+Press `BUTTON1` to erase secondary slot:
 ```
+[INFO][main]: Secondary BlockDevice inited
 [INFO][main]: Erasing secondary BlockDevice...
 [INFO][main]: Secondary BlockDevice erased
+```
+
+Press `BUTTON1` to copy `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` from OTA download simulate slot to secondary slot:
+```
 [INFO][main]: > Press button to copy update image to secondary BlockDevice
-```
-
-### Copying the update image
-
-After pressing the button again, the application will copy the update binary loaded at `mcuboot.primary-slot-address + 0x40000` to the secondary slot block device (typically external flash memory).
-
-You should see output similar to the following:
-
-```
 [INFO][main]: FlashIAPBlockDevice inited
+```
+
+With neither `has-image-trailer` nor `has-image-confirmed` set to `true`, press `BUTTON1` to activate `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` in secondary slot (`boot_set_pending(false)`):
+```
 [INFO][main]: > Image copied to secondary BlockDevice, press button to activate
-```
-
-### Activating the update
-
-When performing an update, the application must tell the bootloader there is a pending update in the secondary slot. After pressing the button again, the application calls the following mcuboot utilty function: `boot_set_pending(false);`
-
-This causes the bootloader to check the secondary slot for a valid update binary.
-
-You should see output similar to the following:
-
-```
-[DBG ][MCUb]: writing magic; fa_id=1 off=0xbfff0 (0xbfff0)
-[DBG ][MCUb]: writing swap_info; fa_id=1 off=0xbffd8 (0xbffd8), swap_type=0x2 image_num=0x0
 [INFO][main]: > Secondary image pending, reboot to update
 ```
 
-### Performing the update
+Otherwise, go reboot:
+```
+[INFO][main]: > Image copied to secondary BlockDevice, reboot to update
+```
 
-Now all you need to do to perform the update is reset your Mbed board! The mcuboot bootloader will then take over and perform the update automatically. You should see output similar to the following:
+Press `RESET` to reboot...
 
+At second boot, notice:
+
+1.  There is firmware upgrade for test-run (`Swap type: test`) or permanently (`Swap type: perm`).
+1.  Firmware version updates to `V1.0.1` (`Hello version 1.0.1+0`).
+1.  With `has-image-confirmed` not set to `true`, image is confirmed `boot_set_confirmed()`, so there won't be firmware upgrade rollback at next boot.
 ```
 [INFO][BL]: Starting MCUboot
-[INFO][MCUb]: Primary image: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
+[INFO][MCUb]: Primary image: ......
 [INFO][MCUb]: Scratch: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
 [INFO][MCUb]: Boot source: primary slot
-[INFO][MCUb]: Swap type: test
-[DBG ][MCUb]: erasing scratch area
-[DBG ][MCUb]: initializing status; fa_id=2
-[DBG ][MCUb]: writing swap_info; fa_id=2 off=0x1ffd8 (0xfffd8), swap_type=0x2 image_num=0x0
-[DBG ][MCUb]: writing swap_size; fa_id=2 off=0x1ffd0 (0xfffd0)
-[DBG ][MCUb]: writing magic; fa_id=2 off=0x1fff0 (0xffff0)
-[DBG ][MCUb]: erasing trailer; fa_id=0
-[DBG ][MCUb]: initializing status; fa_id=0
-[DBG ][MCUb]: writing swap_info; fa_id=0 off=0xbffd8 (0xdffd8), swap_type=0x2 image_num=0x0
-[DBG ][MCUb]: writing swap_size; fa_id=0 off=0xbffd0 (0xdffd0)
-[DBG ][MCUb]: writing magic; fa_id=0 off=0xbfff0 (0xdfff0)
-[DBG ][MCUb]: erasing trailer; fa_id=1
-[DBG ][MCUb]: writing copy_done; fa_id=0 off=0xbffe0 (0xdffe0)
-[INFO][BL]: Booting firmware image at 0x21000
+[INFO][MCUb]: Swap type: test or perm
+[INFO][MCUb]: Starting swap using scratch algorithm.
+[INFO][BL]: Booting firmware image at 0x11000
+```
 
-<Potentially random data from the UART>
-
+With `has-image-confirmed` not set to `true`, image is confirmed:
+```
 [INFO][main]: Boot confirmed
-[INFO][main]: Hello version 1.2.3+5
+```
+
+```
+[INFO][main]: Hello version 1.0.1+0
 [INFO][main]: > Press button to erase secondary slot
 ```
 
-Notice that the reported version number has changed! The update was performed successfully.
+We don't re-play firmware upgrade process. Press `RESET` to reboot...
 
-**Note:** After an update is performed, the new application must mark itself as "okay" to the mcuboot bootloader. If this does not occur, mcuboot will revert the update upon the next reboot (if configured to do so).
+At third boot, notice:
 
-The blinky application in this demo always does this at startup:
-
+1.  There is no firmware upgrade rollback (`Swap type: none`) due to confirmed at the very start (`has-image-confirmed` set to `true`) or at previous boot (`boot_set_confirmed()`).
+1.  Firmware version keeps as updated `V1.0.1` (`Hello version 1.0.1+0`).
 ```
-int ret = boot_set_confirmed();
-```
+[INFO][BL]: Starting MCUboot
+[INFO][MCUb]: Primary image: ......
+[INFO][MCUb]: Scratch: magic=unset, swap_type=0x1, copy_done=0x3, image_ok=0x3
+[INFO][MCUb]: Boot source: none
+[INFO][MCUb]: Swap type: none
+[INFO][BL]: Booting firmware image at 0x11000
 
-In real world situations, your application should run a self test routine to ensure it can receive updates in the future (eg: the UART software works as expected, the BLE stack initializes successfully, etc).
-
-## Additional Features
-
-MCUboot integrates a number of additional features that are commonly used in bootloader situations. More details of these features can be found in the mcuboot documentation/code.
-
-The following sections detail how to enable and use these features in your Mbed-based bootloader/application.
-
-### [Direct XIP](https://www.mcuboot.com/documentation/design/#direct-xip)
-
-TODO
-
-### [Shared Data (experimental)](https://www.mcuboot.com/documentation/design/#boot-data-sharing)
-
-From the MCUboot documentation:
-
-> MCUBoot defines a mechanism for sharing boot status information (also known as measured boot) and an interface for sharing application specific information with the runtime software. 
-
-The data shared from the bootloader to the application is stored in a reserved section of RAM in the form of type-length-value (TLV) encoded entries. This allows you to share any arbitrary data from the bootloader to the application.
-
-#### Configuration
-
-Several configuration changes must be made in both the bootloader and application to enable this feature. Namely:
-
-- `mcuboot.share-data` must be configured to `true`
-- `mcuboot.share-data-base-address` must be set to a word-aligned memory address in RAM. Typically, a small section of RAM is reserved at the end of the MCU's RAM address space for data sharing, which brings us to the next configuration parameters
-- `mcuboot.share-data-size` is set to the number of bytes you want to reserve in RAM for the shared data
-- You must add the following entries to your `target.macros_add` configuration: `MBED_RAM_START=<address>` and `MBED_RAM_SIZE=<RAM size minus reserved region size>`.
-
-**Note**: Some targets, like the K64F, do not support the macros `MBED_RAM_START` and `MBED_RAM_SIZE`. In this case, you will need to use a custom linker script. See [the README.md in the `linker` directory](https://github.com/AGlass0fMilk/mbed-mcuboot-demo/tree/master/linker).
-
-`MBED_RAM_START` should be the starting address of RAM as per your MCU's datasheet. `MBED_RAM_SIZE` should be the total size of your MCU's RAM minus the number of bytes you are reserving for shared data. Note that the required reserved RAM depends on how many entries you want to share with the application.
-
-As mentioned in the MCUboot documentation, the data share region has a global header that is 4 bytes. Each TLV entry has a header size of 4 bytes, plus the number of bytes required to store the data you are sharing.
-
-Let's say you want to reserve 512 bytes of RAM for data sharing, your MCU has a RAM address space that starts at `0x20000000` and your MCU physically has 64kB of RAM. In this case, your configuration file will look as follows:
-
-```
-[...]
-"mcuboot.share-data": true,
-"mcuboot.share-data-base-address": "0x2000FE00",
-"mcuboot.share-data-size": "0x200",
-"target.macros_add": ["MBED_RAM_START=0x20000000", 
-                      "MBED_RAM_SIZE=0xFE00"],
-[...]
+[INFO][main]: Hello version 1.0.1+0
+[INFO][main]: > Press button to erase secondary slot
 ```
 
-Calculations to get the above:
+Firmware has upgraded from `V1.0.0` to `V1.0.1` permanently.
 
-`mcuboot.share-data-size = reserved_bytes = 512`
+## Further reading
 
-`MBED_RAM_START = 0x20000000`
+In the section, advanced topics are addressed here.
 
-`mcuboot.share-data-base-address = MBED_RAM_START + total_RAM - reserved_bytes = 0x20000000 + 64kB - 512 = 0x20000000 + 0x10000 - 0x200 = 0x2000FE00`
+### Changing signing keys
 
-`MBED_RAM_SIZE = total_RAM - reserved_bytes = 0x10000 - 0x200 = 0xFE00`
+Default signing keys, using RSA, are placed in `mbed-ce-mcuboot-demo` repository and synchronized to `mbed-ce-mcuboot-blinky` repository.
+They are exclusively for development and cannot for production.
+In the following, we guide how to change the signature algorithm to ECDSA:
 
-Note that you will have to add this configuration to both your bootloader and application builds. Setting `MBED_RAM_SIZE` prevents initialization code from clearing the reserved RAM region at startup, which would corrupt the shared data.
+1.  In `mbed-ce-mcuboot-demo` repository, generate an ECDSA key pair:
+    ```
+    $ imgtool keygen -k signing-keys.pem -t ecdsa-p256
+    ```
 
-Also note that any RAM reserved for data sharing will be unavailable to the application stack/heap (TODO: fix this, better mbed-os integration), so try to keep your reserved region as small as possible.
-For an example configuration that is already setup for the nRF52840_DK target, see the `mbed_app_data_sharing.json` file in this repository.
+1. Extract the public key into a C data structure:
+    ```
+    $ imgtool getpub -k signing-keys.pem > signing_keys.c
+    ```
 
-**Note:** With Mbed CLI 1, you can use the `--app-config mbed_app_data_sharing.json` option flag to use the data sharing configuration without renaming any files. Building the bootloader and application with this flag will demonstrate usage of the data sharing feature.
+1. Synchronize `signing-keys.pem` and `signing_keys.c` to `mbed-ce-mcuboot-blinky` repository.
 
-#### Code Changes - Bootloader
+1. In both `mbed-ce-mcuboot-demo` and `mbed-ce-mcuboot-blinky` repositories, change signature algorithm to ECDSA:
+    **mbed_app.json5**:
+    ```json5
+    "mcuboot.signature-algorithm": "SIGNATURE_TYPE_EC256",
+    ```
 
-With `mcuboot.shared-data` enabled, the MCUboot bootloader expects a C function to be defined called `boot_save_shared_data`. This function provides a hook for you to add custom TLVs to the shared data region as you require. For an example implementation, see the `shared_data.c/.h` files in this repository.
+1. Rebuild.
 
-#### Code Changes - Application
+### Enable downgrade prevention
 
-Once you have shared data setup and configured for both the bootloader and application, you are ready to access the shared data. During boot, the bootloader will populate the shared data RAM region with the information as you specify in the `boot_save_shared_data` function. The application may then read that information back.
+According to [MCUboot downgrade prevention](https://docs.mcuboot.com/design.html#downgrade-prevention),
+-   **Software-based downgrade prevention** is only available when the overwrite-based image update strategy is used.
+-   **Hardware-based downgrade prevention** is available without dependency on particular image update strategy.
 
-An example of how to do this is built into the `mbed-mcuboot-blinky` application when `mcuboot.share-data` is set to true.
+In this port, **hardware-based downgrade prevention** is not supported.
+In the following, we guide how to enable  **software-based downgrade prevention**:
 
-## Minimizing Code Size
+1. In both `mbed-ce-mcuboot-demo` and `mbed-ce-mcuboot-blinky` repositories, change image update strategy to overwrite-only and enable downgrade prevention:
+    **mbed_app.json5**:
+    ```json5
+    "mcuboot.overwrite-only": true,
+    "mcuboot.downgrade-prevention": true,
+    ```
 
-A common goal of bootloader implementers is to minimize the code size of the bootloader, thereby maximizing the available space for the application. Through configuration, it is possible to acheive relatively small MCUboot-based bootloader builds.
+1. Rebuild.
 
-For example, you can configure `target.printf_lib` to `minimal-printf` rather than `std` to use a reduced-feature-set version of `printf`.
+### Support new target
 
-You can also entirely disable logging output by setting `mbed-trace.enable` to `false`. You can also eliminate the stdio console entirely (TODO - explain how to do this).
+To support new target, follow the procedure:
+
+1.  Following already supported targets, add new target into `mbed-ce-mcuboot-demo/custom_targets` and `mbed-ce-mcuboot-blinky/custom_targets`.
+
+1.  Following already supported targets, add new target into `mbed-ce-mcuboot-demo/mbed_app.json` and `mbed-ce-mcuboot-blinky/mbed_app.json`.
+
+1.  To change location of secondary slot, modify `get_secondary_bd()` defined in `mbed-ce-mcuboot-demo/default_bd.cpp` and `mbed-ce-mcuboot-blinky/main.cpp`.
+
+1.  For `mcuboot.max-img-sectors`, to avoid MCUboot undocumented limitation,
+    1.  When secondary slot is located at external flash, its sector size must be equal to or larger than that of internal flash.
+    1.  Set `mcuboot.max-img-sectors` to (`mcuboot.slot-size` / internal flash sector size) or larger.
+
+1.  For firmware rollback, though undocumented,
+    it is suggested image trailer (+ TLV) size be large enough to hold (`mcuboot.max-img-sectors` * 12 + 2KiB).
+    In most cases, 8KiB or larger will be OK.
+
+    > **_NOTE:_** Image trailer (+ TLV) size is (`mcuboot.primary-slot-address` + `mcuboot.slot-size` - `target.mbed_app_start` - `target.mbed_app_size`).
+
+1.  `mcuboot.scratch-size`, though undocumented, must be large enough to hold image trailer size.
+    Following above, 8KiB or larger will be OK.
