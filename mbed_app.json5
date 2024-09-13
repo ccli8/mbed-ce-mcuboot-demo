@@ -1,5 +1,8 @@
 {
-    "requires": ["bare-metal", "mbedtls", "mcuboot", "flashiap-block-device", "spif-driver", "qspif", "mbed-trace", "sd", "nusd"],
+    "requires": ["bare-metal", "mbedtls", "events", "mcuboot", "flashiap-block-device", "spif-driver", "qspif", "mbed-trace", "sd", "nusd"],
+    "macros": [
+        "MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\""
+    ],
     "config": {
         "serial-bootloader-enable": {
             "help": "Build bootloader with serial update support",
@@ -12,16 +15,27 @@
             "platform.stdio-minimal-console-only": true,
             "platform.use-mpu": false,
             "target.boot-stack-size": "0x1800",
-            "target.restrict_size": "0x20000",
+            "target.memory_bank_config": {
+                "IROM1": {
+                    "start": 0x0,
+                    "size": 0x20000
+                }
+            },
             "target.c_lib": "small",
             "target.macros_add": ["MCUBOOT_HAVE_LOGGING", "NDEBUG"],
+            "target.application-profile": "bare-metal",
             "mcuboot.log-level": "MCUBOOT_LOG_LEVEL_INFO",
             "mbed-trace.enable": true,
             "mbed-trace.max-level": "TRACE_LEVEL_INFO",
             "mbed-trace.fea-ipv6": false
         },
         "NUMAKER_IOT_M467": {
-            "target.restrict_size"                      : "0x10000",
+            "target.memory_bank_config": {
+                "IROM1": {
+                    "start": 0x0,
+                    "size": 0x10000
+                }
+            },
             "target.extra_labels_remove"                : ["PSA"],
             "target.device_has_remove"                  : ["LPTICKER"],
             "target.macros_remove"                      : ["MBEDTLS_CONFIG_HW_SUPPORT"]
@@ -65,7 +79,12 @@
             "mcuboot.slot-size"                         : "0x73000"
         },
         "NUMAKER_IOT_M467_SPIF_BOOT80K": {
-            "target.restrict_size"                      : "0x14000",
+            "target.memory_bank_config": {
+                "IROM1": {
+                    "start": 0x0,
+                    "size": 0x14000
+                }
+            },
             "mcuboot.primary-slot-address"              : "0x14000",
             "mcuboot.slot-size"                         : "0xE2000",
             "mcuboot.scratch-address"                   : "0xFD000",
@@ -94,7 +113,12 @@
             "mcuboot.slot-size"                         : "0x73000"
         },
         "NUMAKER_IOT_M487": {
-            "target.restrict_size"                      : "0x10000",
+            "target.memory_bank_config": {
+                "IROM1": {
+                    "start": 0x0,
+                    "size": 0x10000
+                }
+            },
             "target.extra_labels_remove"                : ["PSA"],
             "target.device_has_remove"                  : ["LPTICKER"],
             "target.macros_remove"                      : ["MBEDTLS_CONFIG_HW_SUPPORT"]

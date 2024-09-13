@@ -29,7 +29,7 @@ const spi_pinmap_t static_spi_pinmap = get_spi_pinmap(MBED_CONF_SD_SPI_MOSI, MBE
 #endif
 #endif
 
-#if COMPONENT_FLASHIAP
+#if DEVICE_FLASH
 #include "FlashIAP/FlashIAPBlockDevice.h"
 #endif
 
@@ -89,7 +89,7 @@ mbed::BlockDevice* get_secondary_bd(void) {
     static FlashIAPBlockDevice fbd(MCUBOOT_PRIMARY_SLOT_START_ADDR + MCUBOOT_SLOT_SIZE, MCUBOOT_SLOT_SIZE);
     return &fbd;
 #   elif TARGET_NUMAKER_IOT_M467_FLASHIAP_DUALBANK || \
-       TARGET_NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
+         TARGET_NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
     static FlashIAPBlockDevice fbd(0x80000, MCUBOOT_SLOT_SIZE);
     return &fbd;
 #   elif TARGET_NUMAKER_IOT_M467_SPIF || \
@@ -131,6 +131,7 @@ mbed::BlockDevice* get_secondary_bd(void) {
     // In this case, our flash is much larger than a single image so
     // slice it into the size of an image slot
     mbed::BlockDevice* default_bd = mbed::BlockDevice::get_default_instance();
+    MBED_ASSERT(default_bd);
     static mbed::SlicingBlockDevice sliced_bd(default_bd, 0x0, MCUBOOT_SLOT_SIZE);
     return &sliced_bd;
 #endif
