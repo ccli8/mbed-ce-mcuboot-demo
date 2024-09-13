@@ -1,4 +1,4 @@
-# Getting started with MCUboot for Nuvoton Mbed-Enabled platform
+# Getting started with MCUboot for Nuvoton Mbed CE enabled platform
 
 [MCUboot](https://www.mcuboot.com/) is a secure bootloader for 32-bits micro-controllers.
 There has been an [MCUboot port for Mbed OS](https://docs.mcuboot.com/readme-mbed.html).
@@ -9,15 +9,15 @@ are created to demo MCUboot with Mbed OS.
 Based on above work, this document gets you started with MCUboot for Nuvoton Mbed-Enabled platform.
 It walks you through:
 
--   Constructing one reference MCUboot port for Mbed OS build environment on Windows
+-   Constructing one reference MCUboot port for [Mbed CE](https://github.com/mbed-ce) build environment on Windows
 -   Demonstrating firmware upgrade process with MCUboot for Nuvoton's platform
 
 ## Hardware requirements
 
--   NuMaker-IoT-M467 board
--   [NuMaker-IoT-M487 board](https://os.mbed.com/platforms/NUMAKER-IOT-M487/)
+-   [NuMaker-IoT-M467 board](https://www.nuvoton.com/board/numaker-iot-m467/)
+-   [NuMaker-IoT-M487 board](https://www.nuvoton.com/products/iot-solution/iot-platform/numaker-iot-m487/)
 
-Currently, Nuvoton-forked `mbed-mcuboot-demo`/`mbed-mcuboot-blinky` repositories support above boards.
+Currently, Nuvoton-forked `mbed-ce-mcuboot-demo`/`mbed-ce-mcuboot-blinky` repositories support above boards.
 Choose one of them for demo in the following.
 
 ### Support targets
@@ -51,75 +51,28 @@ Their internal flash maps are designed to support firmware upgrade in-place, wit
 
 ## Software requirements
 
-Below list necessary tools and their versions against which Mbed MCUboot programs can build successfully with this document:
+-   [Git](https://gitforwindows.org/)
 
--   [Git](https://gitforwindows.org/) 2.33.0 (Native Windows)
+-   [Python3](https://www.python.org/)
 
--   [Python3](https://www.python.org/) 3.8.7 (Native Windows)
+-   [CMake](https://cmake.org/)
 
--   [Mbed CLI 1](https://os.mbed.com/docs/mbed-os/v6.15/build-tools/mbed-cli-1.html) 1.10.5 (Native Windows)
+-   [Ninja](https://github.com/ninja-build/ninja/releases)
 
--   [GNU Arm Embedded Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm) 10.3-2021.07 (Native Windows) or
-    Arm Compiler 6.12  (Native Windows)
+-   [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
 
--   [Image tool](https://github.com/mcu-tools/mcuboot/blob/main/docs/imgtool.md) 1.7.2 (Native Windows)
+-   [Image tool](https://github.com/mcu-tools/mcuboot/blob/main/docs/imgtool.md)
 
--   [SRecord](http://srecord.sourceforge.net/) 1.63 (Native Windows)
+-   [SRecord](http://srecord.sourceforge.net/)
 
-### Configuring proxy for the tools
+For [VS Code development](https://github.com/mbed-ce/mbed-os/wiki/Project-Setup:-VS-Code)
+or [OpenOCD as upload method](https://github.com/mbed-ce/mbed-os/wiki/Upload-Methods#openocd),
+install below additionally:
 
-If your network is behind the firewall, configure proxy for the tools which need to communicate with outside.
-If not, just skip this step.
+-   [NuEclipse](https://github.com/OpenNuvoton/Nuvoton_Tools#numicro-software-development-tools): Nuvoton's fork of Eclipse
 
--   Python3 pip: In git-bash, run:
-```
-$ export http_proxy=http://<USER>:<PASSWORD>@<PROXY-SERVER>:<PORT>/
-$ export https_proxy=$http_proxy
-```
-
--   Git: Luckily, Git also honors the environmental variables `http_proxy`/`https_proxy`, which have been set appropriately above.
-
-### Confirming all the tools are ready
-
-This step is to confirm if all tools have been ready.
-If you are confident, just skip this step.
-In git-bash, check if all tools are present and of right versions:
-```
-$ which git; git version
-/mingw64/bin/git
-git version 2.33.0.windows.2
-
-$ which python; python --version; which pip; pip --version
-/c/Python38/python
-Python 3.8.7
-/c/Python38/Scripts/pip
-pip 21.3.1 from c:\python38\lib\site-packages\pip (python 3.8)
-
-$ which mbed; mbed --version
-/c/Python38/Scripts/mbed
-1.10.5
-
-$ which arm-none-eabi-gcc; arm-none-eabi-gcc --version
-/C/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.07/bin/arm-none-eabi-gcc
-arm-none-eabi-gcc.exe (GNU Arm Embedded Toolchain 10.3-2021.07) 10.3.1 20210621 (release)
-Copyright (C) 2020 Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-$ which armclang; armclang --version
-/C/Keil_v5/ARM/ARMCLANG/bin/armclang
-Product: MDK Plus 5.28
-Component: ARM Compiler 6.12
-Tool: armclang [5d624a00]
-
-$ which imgtool; imgtool version
-/c/Python38/Scripts/imgtool
-1.7.2
-
-$ which srec_cat; srec_cat --version
-/path-to-srecord/srec_cat
-srec_cat version 1.63.D001
-```
+-   Nuvoton forked OpenOCD: Shipped with NuEclipse installation package above.
+    Checking openocd version `openocd --version`, it should fix to `0.10.022`.
 
 ## Walking through internal flash map
 
@@ -231,16 +184,20 @@ In the chapter, we choose the following targets for demonstrating firmware upgra
 
 In git-bash, follow the instructions below to build MCUboot bootloader.
 
-First, clone Nuvoton-forked `mbed-mcuboot-demo` repository and switch to the branch `nuvoton_port`:
+First, clone Nuvoton-forked `mbed-ce-mcuboot-demo` repository and switch to the branch `nuvoton_port`:
 ```
-$ git clone https://github.com/OpenNuvoton/mbed-mcuboot-demo
-$ cd mbed-mcuboot-demo
+$ git clone https://github.com/OpenNuvotonMbed/mbed-ce-mcuboot-demo
+$ cd mbed-ce-mcuboot-demo
 $ git checkout -f nuvoton_port
 ```
 
 Install dependent modules:
 ```
-$ mbed deploy
+$ git submodule update --init --recursive
+```
+Or for fast install:
+```
+$ git submodule update --init --recursive --filter=blob:none
 ```
 
 If `imgtool` hasn't installed yet, install it. This finalizes software requirements:
@@ -248,78 +205,94 @@ If `imgtool` hasn't installed yet, install it. This finalizes software requireme
 $ pip install -r mcuboot/scripts/requirements.txt
 ```
 
-Build `mbed-mcuboot-demo`:
+Build `mbed-ce-mcuboot-demo`:
 
 -   `NUMAKER_IOT_M487_SPIF_TEST`
 
     ```
-    $ mbed compile -m NUMAKER_IOT_M487_SPIF_TEST -t GCC_ARM
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M487_SPIF_TEST
+    $ ninja
+    $ cd ..
     ```
 
 -   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
 
     ```
-    $ mbed compile -m NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST -t GCC_ARM
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
+    $ ninja
+    $ cd ..
     ```
 
 ### Building MCUboot-enabled application
 
 In git-bash, follow the instructions below to build MCUboot-enabled application.
 
-Clone Nuvoton-forked `mbed-mcuboot-blinky` repository and switch to the branch `nuvoton_port`:
+Clone Nuvoton-forked `mbed-ce-mcuboot-blinky` repository and switch to the branch `nuvoton_port`:
 ```
-$ git clone https://github.com/OpenNuvoton/mbed-mcuboot-blinky
-$ cd mbed-mcuboot-blinky
+$ git clone https://github.com/OpenNuvotonMbed/mbed-ce-mcuboot-blinky
+$ cd mbed-ce-mcuboot-blinky
 $ git checkout -f nuvoton_port
 ```
 
 Install dependent modules:
 ```
-$ mbed deploy
+$ git submodule update --init
+```
+Or for fast install:
+```
+$ git submodule update --init --filter=blob:none
 ```
 
 Configure MCUboot image format, which must be consistent with signing through imgtool:
 
 -   MCUboot image has no trailer:
 
-    **mbed_app.json**:
-    ```json
+    **mbed_app.json5**:
+    ```json5
     "has-image-trailer"                         : false,
     "has-image-confirmed"                       : false,
     ```
 
 -   MCUboot image has trailer added through imgtool --pad parameter in signing:
 
-    **mbed_app.json**:
-    ```json
+    **mbed_app.json5**:
+    ```json5
     "has-image-trailer"                         : true,
     "has-image-confirmed"                       : false,
     ```
 
 -   MCUboot image has confirmed through imgtool --confirm parameter in signing:
 
-    **mbed_app.json**:
-    ```json
+    **mbed_app.json5**:
+    ```json5
     "has-image-confirmed"                       : true,
     ```
 
 > **_NOTE:_** imgtool `--confirm` implies imgtool `--pad`.
 
-Build `mbed-mcuboot-blinky`:
+Build `mbed-ce-mcuboot-blinky`:
 
 -   `NUMAKER_IOT_M487_SPIF_TEST`
 
     ```
-    $ mbed compile -m NUMAKER_IOT_M487_SPIF_TEST -t GCC_ARM
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M487_SPIF_TEST
+    $ ninja
+    $ cd ..
     ```
 
 -   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
 
     ```
-    $ mbed compile -m NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST -t GCC_ARM
+    $ mkdir build; cd build
+    $ cmake .. -GNinja -DCMAKE_BUILD_TYPE=Develop -DMBED_TARGET=NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST
+    $ ninja
+    $ cd ..
     ```
 
-Sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.0_signed.bin` for first version:
+Sign `mbed-ce-mcuboot-blinky.bin` to `mbed-ce-mcuboot-blinky_V1.0.0_signed.bin` for first version:
 
 -   `NUMAKER_IOT_M487_SPIF_TEST`
 
@@ -331,8 +304,8 @@ Sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.0_signed.bin` for fi
     --header-size 4096 \
     --pad-header \
     -S 0x33000 \
-    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
-    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin
     ```
 
 -   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
@@ -346,8 +319,8 @@ Sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.0_signed.bin` for fi
     --pad-header \
     --confirm \
     -S 0x38000 \
-    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
-    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin
     ```
 
 > **_NOTE:_** `-k signing-keys.pem` is to specify signing key.
@@ -361,7 +334,7 @@ which is (`target.mbed_app_start` - `mcuboot.primary-slot-address`).
 
 > **_NOTE:_** On `has-image-confirmed` set to `true`, also add `--confirm` to meet the configuration. Implying above, this marks the image as confirmed and so image revert is disabled.
 
-Then sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.1_signed.bin` for second version:
+Then sign `mbed-ce-mcuboot-blinky.bin` to `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` for second version:
 
 -   `NUMAKER_IOT_M487_SPIF_TEST`
 
@@ -373,8 +346,8 @@ Then sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.1_signed.bin` f
     --header-size 4096 \
     --pad-header \
     -S 0x33000 \
-    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
-    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin
     ```
 
 -   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
@@ -388,44 +361,44 @@ Then sign `mbed-mcuboot-blinky.bin` to `mbed-mcuboot-blinky_V1.0.1_signed.bin` f
     --pad-header \
     --confirm \
     -S 0x38000 \
-    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky.bin \
-    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin
+    build/mbed-ce-mcuboot-blinky.bin \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin
     ```
 
-Combine `mbed-mcuboot-demo.bin`, `mbed-mcuboot-blinky_V1.0.0_signed.bin`, and `mbed-mcuboot-blinky_V1.0.1_signed.bin`.
+Combine `mbed-ce-mcuboot-demo.bin`, `mbed-ce-mcuboot-blinky_V1.0.0_signed.bin`, and `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin`.
 
 -   `NUMAKER_IOT_M487_SPIF_TEST`
 
     ```
     $ srec_cat \
-    ../mbed-mcuboot-demo/BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-demo.bin -Binary -offset 0x0 \
-    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
-    BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0x43000 \
-    -o BUILD/NUMAKER_IOT_M487_SPIF_TEST/GCC_ARM/mbed-mcuboot-blinky_merged.hex -Intel
+    ../mbed-ce-mcuboot-demo/build/mbed-ce-mcuboot-demo.bin -Binary -offset 0x0 \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0x43000 \
+    -o build/mbed-ce-mcuboot-blinky_merged.hex -Intel
     ```
 
 -   `NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST`
 
     ```
     $ srec_cat \
-    ../mbed-mcuboot-demo/BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-demo.bin -Binary -offset 0x0 \
-    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
-    BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0xB8000 \
-    -o BUILD/NUMAKER_IOT_M467_FLASHIAP_DUALBANK_TEST/GCC_ARM/mbed-mcuboot-blinky_merged.hex -Intel
+    ../mbed-ce-mcuboot-demo/build/mbed-ce-mcuboot-demo.bin -Binary -offset 0x0 \
+    build/mbed-ce-mcuboot-blinky_V1.0.0_signed.bin -Binary -offset 0x10000 \
+    build/mbed-ce-mcuboot-blinky_V1.0.1_signed.bin -Binary -offset 0xB8000 \
+    -o build/mbed-ce-mcuboot-blinky_merged.hex -Intel
     ```
 
-> **_NOTE:_** Assume `mbed-mcuboot-demo`/`mbed-mcuboot-blinky` repositories are cloned into the same directory,
-so that we can reference `mbed-mcuboot-demo` repository as above.
+> **_NOTE:_** Assume `mbed-ce-mcuboot-demo`/`mbed-ce-mcuboot-blinky` repositories are cloned into the same directory,
+so that we can reference `mbed-ce-mcuboot-demo` repository as above.
 
-> **_NOTE:_** `-offset 0x0` is to specify start address of MCUboot bootloader mbed-mcuboot-demo.bin.
+> **_NOTE:_** `-offset 0x0` is to specify start address of MCUboot bootloader mbed-ce-mcuboot-demo.bin.
 
-> **_NOTE:_** `-offset 0x10000` is to specify start address of primary slot where `mbed-mcuboot-blinky_V1.0.0_signed.bin` resides.
+> **_NOTE:_** `-offset 0x10000` is to specify start address of primary slot where `mbed-ce-mcuboot-blinky_V1.0.0_signed.bin` resides.
 
-> **_NOTE:_** `-offset 0x43000` or `-offset 0xB8000` is to specify start address of OTA download simulate slot where `mbed-mcuboot-blinky_V1.0.1_signed.bin` resides.
+> **_NOTE:_** `-offset 0x43000` or `-offset 0xB8000` is to specify start address of OTA download simulate slot where `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` resides.
 
 > **_NOTE:_** For pre-flash, it is unnecessary to combine secondary slot. Update firmware will update to it from OTA download simulate slot at run-time.
 
-Finally, drag-n-drop `mbed-mcuboot-blinky_merged.hex` onto target board for flashing.
+Finally, drag-n-drop `mbed-ce-mcuboot-blinky_merged.hex` onto target board for flashing.
 
 ### Monitoring firmware upgrade process through host console
 
@@ -457,13 +430,13 @@ Press `BUTTON1` to erase secondary slot:
 [INFO][main]: Secondary BlockDevice erased
 ```
 
-Press `BUTTON1` to copy `mbed-mcuboot-blinky_V1.0.1_signed.bin` from OTA download simulate slot to secondary slot:
+Press `BUTTON1` to copy `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` from OTA download simulate slot to secondary slot:
 ```
 [INFO][main]: > Press button to copy update image to secondary BlockDevice
 [INFO][main]: FlashIAPBlockDevice inited
 ```
 
-With neither `has-image-trailer` nor `has-image-confirmed` set to `true`, press `BUTTON1` to activate `mbed-mcuboot-blinky_V1.0.1_signed.bin` in secondary slot (`boot_set_pending(false)`):
+With neither `has-image-trailer` nor `has-image-confirmed` set to `true`, press `BUTTON1` to activate `mbed-ce-mcuboot-blinky_V1.0.1_signed.bin` in secondary slot (`boot_set_pending(false)`):
 ```
 [INFO][main]: > Image copied to secondary BlockDevice, press button to activate
 [INFO][main]: > Secondary image pending, reboot to update
@@ -527,11 +500,11 @@ In the section, advanced topics are addressed here.
 
 ### Changing signing keys
 
-Default signing keys, using RSA, are placed in `mbed-mcuboot-demo` repository and synchronized to `mbed-mcuboot-blinky` repository.
+Default signing keys, using RSA, are placed in `mbed-ce-mcuboot-demo` repository and synchronized to `mbed-ce-mcuboot-blinky` repository.
 They are exclusively for development and cannot for production.
 In the following, we guide how to change the signature algorithm to ECDSA:
 
-1.  In `mbed-mcuboot-demo` repository, generate an ECDSA key pair:
+1.  In `mbed-ce-mcuboot-demo` repository, generate an ECDSA key pair:
     ```
     $ imgtool keygen -k signing-keys.pem -t ecdsa-p256
     ```
@@ -541,11 +514,11 @@ In the following, we guide how to change the signature algorithm to ECDSA:
     $ imgtool getpub -k signing-keys.pem > signing_keys.c
     ```
 
-1. Synchronize `signing-keys.pem` and `signing_keys.c` to `mbed-mcuboot-blinky` repository.
+1. Synchronize `signing-keys.pem` and `signing_keys.c` to `mbed-ce-mcuboot-blinky` repository.
 
-1. In both `mbed-mcuboot-demo` and `mbed-mcuboot-blinky` repositories, change signature algorithm to ECDSA:
-    **mbed_app.json**:
-    ```json
+1. In both `mbed-ce-mcuboot-demo` and `mbed-ce-mcuboot-blinky` repositories, change signature algorithm to ECDSA:
+    **mbed_app.json5**:
+    ```json5
     "mcuboot.signature-algorithm": "SIGNATURE_TYPE_EC256",
     ```
 
@@ -560,9 +533,9 @@ According to [MCUboot downgrade prevention](https://docs.mcuboot.com/design.html
 In this port, **hardware-based downgrade prevention** is not supported.
 In the following, we guide how to enable  **software-based downgrade prevention**:
 
-1. In both `mbed-mcuboot-demo` and `mbed-mcuboot-blinky` repositories, change image update strategy to overwrite-only and enable downgrade prevention:
-    **mbed_app.json**:
-    ```json
+1. In both `mbed-ce-mcuboot-demo` and `mbed-ce-mcuboot-blinky` repositories, change image update strategy to overwrite-only and enable downgrade prevention:
+    **mbed_app.json5**:
+    ```json5
     "mcuboot.overwrite-only": true,
     "mcuboot.downgrade-prevention": true,
     ```
@@ -573,11 +546,11 @@ In the following, we guide how to enable  **software-based downgrade prevention*
 
 To support new target, follow the procedure:
 
-1.  Following already supported targets, add new target into `mbed-mcuboot-demo/custom_targets.json` and `mbed-mcuboot-blinky/custom_targets.json`.
+1.  Following already supported targets, add new target into `mbed-ce-mcuboot-demo/custom_targets` and `mbed-ce-mcuboot-blinky/custom_targets`.
 
-1.  Following already supported targets, add new target into `mbed-mcuboot-demo/mbed_app.json` and `mbed-mcuboot-blinky/mbed_app.json`.
+1.  Following already supported targets, add new target into `mbed-ce-mcuboot-demo/mbed_app.json` and `mbed-ce-mcuboot-blinky/mbed_app.json`.
 
-1.  To change location of secondary slot, modify `get_secondary_bd()` defined in `mbed-mcuboot-demo/default_bd.cpp` and `mbed-mcuboot-blinky/main.cpp`.
+1.  To change location of secondary slot, modify `get_secondary_bd()` defined in `mbed-ce-mcuboot-demo/default_bd.cpp` and `mbed-ce-mcuboot-blinky/main.cpp`.
 
 1.  For `mcuboot.max-img-sectors`, to avoid MCUboot undocumented limitation,
     1.  When secondary slot is located at external flash, its sector size must be equal to or larger than that of internal flash.
